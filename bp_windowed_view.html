@@ -1,0 +1,813 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blood Pressure 5-Day Window View</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .date-range {
+            font-size: 18px;
+            font-weight: bold;
+            color: #34495e;
+            padding: 10px 20px;
+            background-color: white;
+            border-radius: 6px;
+            border: 2px solid #3498db;
+        }
+        .legend {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #fff3cd;
+            border-radius: 6px;
+            border-left: 4px solid #ffc107;
+        }
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        #chart {
+            margin: 20px 0;
+        }
+        #medications {
+            margin: 20px 0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-box h3 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .stat-box .value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Blood Pressure 5-Day Window View</h1>
+
+        <div style="text-align: right; margin-bottom: 20px;">
+            <button onclick="window.location.href='/edit'" style="padding: 12px 24px; margin-right: 10px; background-color: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px;">
+                ➕ Add Data
+            </button>
+            <button onclick="location.reload()" style="padding: 12px 24px; background-color: #2ecc71; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px;">
+                🔄 Update
+            </button>
+        </div>
+
+        <div class="legend">
+            <strong>🎯 Alert Thresholds:</strong>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #e74c3c;"></span>
+                <span>🚨 收缩压 > 140 mmHg (High Systolic)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #e74c3c;"></span>
+                <span>🚨 舒张压 < 57 mmHg (Low Diastolic)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #3498db;"></span>
+                <span>✓ Normal Range</span>
+            </div>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <div class="controls" style="justify-content: space-between; align-items: center;">
+            <div id="dateRange" style="font-size: 18px; font-weight: bold; color: #2c3e50; padding: 10px 20px; background-color: #e8f4f8; border-radius: 6px; border-left: 4px solid #3498db;"></div>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-weight: bold; color: #34495e;">Window Size:</div>
+                    <button onclick="changeWindowSize(-1)" style="padding: 8px 16px;">-</button>
+                    <div id="windowSizeDisplay" style="font-size: 18px; font-weight: bold; min-width: 60px; text-align: center; color: #3498db;">5 days</div>
+                    <button onclick="changeWindowSize(1)" style="padding: 8px 16px;">+</button>
+                </div>
+                <div style="width: 2px; height: 40px; background-color: #bdc3c7;"></div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="font-weight: bold; color: #34495e;">Navigate:</div>
+                    <button id="prevBtn" onclick="moveWindow(-1)">← Prev</button>
+                    <button id="nextBtn" onclick="moveWindow(1)">Next →</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="chart1" style="margin-top: 20px;"></div>
+        <div id="chart2" style="margin-top: 10px; margin-bottom: 20px;"></div>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px; color: #27ae60; border-bottom: 2px solid #27ae60; padding-bottom: 10px;">
+            📈 Daily Pattern Analysis (Time of Day)
+        </h2>
+
+        <div id="chart3" style="margin-top: 20px;"></div>
+        <div id="chart4" style="margin-top: 10px; margin-bottom: 20px;"></div>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px; color: #9b59b6; border-bottom: 2px solid #9b59b6; padding-bottom: 10px;">
+            📊 Daily Blood Pressure Range Trend
+        </h2>
+        <div id="chart5" style="margin-top: 20px; margin-bottom: 30px;"></div>
+
+        <div id="medications"></div>
+    </div>
+
+    <script>
+        let bpData = [];
+        let medData = [];
+        let allDates = [];
+
+        // Fetch data from API
+        async function loadData() {
+            try {
+                const response = await fetch('/api/data/all');
+                const data = await response.json();
+
+                // Parse BP readings
+                bpData = data.bp_readings.map(record => {
+                    const datetime = record[0];
+                    const [date, time] = datetime.split(' ');
+                    const timeShort = time.substring(0, 5);
+                    return {
+                        datetime: datetime,
+                        date: date,
+                        time: timeShort,
+                        systolic: record[1],
+                        diastolic: record[2],
+                        heart_rate: record[3]
+                    };
+                });
+
+                // Parse medications
+                medData = data.medications.map(record => {
+                    const datetime = record[0];
+                    const [date, time] = datetime.split(' ');
+                    const timeShort = time.substring(0, 5);
+                    return {
+                        datetime: datetime,
+                        date: date,
+                        time: timeShort,
+                        medication: record[1],
+                        dosage: record[2]
+                    };
+                });
+
+                // Extract unique dates
+                const dateSet = new Set(bpData.map(d => d.date));
+                allDates = Array.from(dateSet).sort();
+
+                // Initialize and render
+                initializeApp();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Failed to load data from database');
+            }
+        }
+
+        let currentWindowStart = 0;
+        let windowSize = 5;
+
+        function getColorForPoint(systolic, diastolic) {
+            if (systolic > 140 || diastolic < 57) {
+                return '#e74c3c';  // Red for alerts
+            }
+            return '#3498db';  // Blue for normal
+        }
+
+        function changeWindowSize(delta) {
+            const newSize = windowSize + delta;
+            if (newSize >= 1 && newSize <= allDates.length) {
+                windowSize = newSize;
+                // Adjust window start if needed
+                if (currentWindowStart + windowSize > allDates.length) {
+                    currentWindowStart = Math.max(0, allDates.length - windowSize);
+                }
+                document.getElementById('windowSizeDisplay').textContent = `${windowSize} day${windowSize !== 1 ? 's' : ''}`;
+                updateView();
+            }
+        }
+
+        // Function to break lines between days
+        function getDataWithDayBreaks(windowBP, field) {
+            const x = [];
+            const y = [];
+
+            for (let i = 0; i < windowBP.length; i++) {
+                x.push(windowBP[i].datetime);
+                y.push(windowBP[i][field]);
+
+                // Add null values between different days to break the line
+                if (i < windowBP.length - 1) {
+                    const currentDate = windowBP[i].date;
+                    const nextDate = windowBP[i + 1].date;
+
+                    if (currentDate !== nextDate) {
+                        x.push(null);
+                        y.push(null);
+                    }
+                }
+            }
+
+            return { x, y };
+        }
+
+        function updateView() {
+            const startIdx = currentWindowStart;
+            const endIdx = Math.min(currentWindowStart + windowSize, allDates.length);
+            const windowDates = allDates.slice(startIdx, endIdx);
+
+            // Update date range display
+            document.getElementById('dateRange').textContent =
+                `${windowDates[0]} to ${windowDates[windowDates.length - 1]}`;
+
+            // Filter data for current window
+            const windowBP = bpData.filter(d => windowDates.includes(d.date));
+            const windowMed = medData.filter(d => windowDates.includes(d.date));
+
+            // Calculate stats for this window
+            const validSystolic = windowBP.filter(d => d.systolic !== null).map(d => d.systolic);
+            const validDiastolic = windowBP.filter(d => d.diastolic !== null).map(d => d.diastolic);
+            const validHR = windowBP.filter(d => d.heart_rate !== null).map(d => d.heart_rate);
+
+            const avgSystolic = validSystolic.length > 0 ?
+                (validSystolic.reduce((a, b) => a + b, 0) / validSystolic.length).toFixed(1) : 'N/A';
+            const avgDiastolic = validDiastolic.length > 0 ?
+                (validDiastolic.reduce((a, b) => a + b, 0) / validDiastolic.length).toFixed(1) : 'N/A';
+            const avgHR = validHR.length > 0 ?
+                (validHR.reduce((a, b) => a + b, 0) / validHR.length).toFixed(1) : 'N/A';
+
+            const alertCount = windowBP.filter(d =>
+                (d.systolic !== null && d.systolic > 140) ||
+                (d.diastolic !== null && d.diastolic < 57)
+            ).length;
+
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-box">
+                    <h3>Readings</h3>
+                    <div class="value">${windowBP.length}</div>
+                </div>
+                <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <h3>Avg 收缩压 (Systolic)</h3>
+                    <div class="value">${avgSystolic}</div>
+                </div>
+                <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <h3>Avg 舒张压 (Diastolic)</h3>
+                    <div class="value">${avgDiastolic}</div>
+                </div>
+                <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <h3>Avg Heart Rate</h3>
+                    <div class="value">${avgHR}</div>
+                </div>
+                <div class="stat-box" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <h3>🚨 Alerts</h3>
+                    <div class="value">${alertCount}</div>
+                </div>
+            `;
+
+            // Calculate daily min/max
+            const dailyStats = {};
+            windowDates.forEach(date => {
+                const dayData = windowBP.filter(d => d.date === date);
+                const systolicValues = dayData.filter(d => d.systolic !== null).map(d => d.systolic);
+                const diastolicValues = dayData.filter(d => d.diastolic !== null).map(d => d.diastolic);
+
+                if (systolicValues.length > 0) {
+                    const maxSystolic = Math.max(...systolicValues);
+                    const maxSystolicEntry = dayData.find(d => d.systolic === maxSystolic);
+                    dailyStats[date] = dailyStats[date] || {};
+                    dailyStats[date].maxSystolic = { value: maxSystolic, datetime: maxSystolicEntry.datetime };
+                }
+
+                if (diastolicValues.length > 0) {
+                    // Find the minimum among morning readings only (<= 1pm)
+                    const morningData = dayData.filter(d => {
+                        const hour = new Date(d.datetime).getHours();
+                        return hour <= 13 && d.diastolic !== null;
+                    });
+
+                    if (morningData.length > 0) {
+                        const morningDiastolicValues = morningData.map(d => d.diastolic);
+                        const minMorningDiastolic = Math.min(...morningDiastolicValues);
+                        const minDiastolicEntry = morningData.find(d => d.diastolic === minMorningDiastolic);
+
+                        dailyStats[date] = dailyStats[date] || {};
+                        dailyStats[date].minDiastolic = { value: minMorningDiastolic, datetime: minDiastolicEntry.datetime };
+                    }
+                }
+            });
+
+            // Prepare data with day breaks (removes lines between days)
+            const systolicData = getDataWithDayBreaks(windowBP, 'systolic');
+            const diastolicData = getDataWithDayBreaks(windowBP, 'diastolic');
+
+            // Prepare color arrays with nulls for breaks
+            const systolicColors = [];
+            const diastolicColors = [];
+
+            for (let i = 0; i < windowBP.length; i++) {
+                const d = windowBP[i];
+                systolicColors.push(d.systolic !== null && d.systolic > 140 ? '#e74c3c' : '#3498db');
+
+                // Add null color for day breaks
+                if (i < windowBP.length - 1 && windowBP[i].date !== windowBP[i + 1].date) {
+                    systolicColors.push('#3498db');
+                }
+            }
+
+            for (let i = 0; i < windowBP.length; i++) {
+                const d = windowBP[i];
+                diastolicColors.push(d.diastolic !== null && d.diastolic < 57 ? '#e74c3c' : '#3498db');
+
+                // Add null color for day breaks
+                if (i < windowBP.length - 1 && windowBP[i].date !== windowBP[i + 1].date) {
+                    diastolicColors.push('#3498db');
+                }
+            }
+
+            // Chart 1: Systolic Blood Pressure (收缩压)
+            const systolicTrace = {
+                x: systolicData.x,
+                y: systolicData.y,
+                mode: 'lines+markers',
+                name: '收缩压 (Systolic)',
+                line: {
+                    color: '#e74c3c',
+                    width: 2.5,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 8,
+                    color: systolicColors,
+                    line: { color: '#fff', width: 1.5 }
+                },
+                connectgaps: false,
+                hovertemplate: '<b>收缩压</b><br>%{x}<br><b>%{y} mmHg</b><extra></extra>'
+            };
+
+            const systolicLayout = {
+                height: 500,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Date & Time',
+                    gridcolor: '#e0e0e0'
+                },
+                yaxis: {
+                    title: '收缩压 (mmHg)',
+                    gridcolor: '#e0e0e0',
+                    range: [90, 165]
+                },
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: windowBP[0]?.datetime || '',
+                        x1: windowBP[windowBP.length - 1]?.datetime || '',
+                        y0: 140,
+                        y1: 140,
+                        line: { color: '#e74c3c', width: 3, dash: 'dash' },
+                        yref: 'y'
+                    },
+                    {
+                        type: 'rect',
+                        x0: windowBP[0]?.datetime || '',
+                        x1: windowBP[windowBP.length - 1]?.datetime || '',
+                        y0: 140,
+                        y1: 165,
+                        fillcolor: '#e74c3c',
+                        opacity: 0.1,
+                        line: { width: 0 }
+                    }
+                ],
+                annotations: Object.values(dailyStats).map(stat => {
+                    if (stat.maxSystolic) {
+                        return {
+                            x: stat.maxSystolic.datetime,
+                            y: stat.maxSystolic.value,
+                            text: `<b>${stat.maxSystolic.value}</b>`,
+                            showarrow: true,
+                            arrowhead: 2,
+                            arrowsize: 1,
+                            arrowwidth: 2,
+                            arrowcolor: '#c0392b',
+                            ax: 0,
+                            ay: -30,
+                            bgcolor: '#fff',
+                            bordercolor: '#c0392b',
+                            borderwidth: 2,
+                            borderpad: 4,
+                            font: { color: '#c0392b', size: 12, weight: 'bold' }
+                        };
+                    }
+                }).filter(a => a)
+            };
+
+            // Chart 2: Diastolic Blood Pressure (舒张压)
+            const diastolicTrace = {
+                x: diastolicData.x,
+                y: diastolicData.y,
+                mode: 'lines+markers',
+                name: '舒张压 (Diastolic)',
+                line: {
+                    color: '#3498db',
+                    width: 2.5,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 8,
+                    color: diastolicColors,
+                    line: { color: '#fff', width: 1.5 }
+                },
+                connectgaps: false,
+                hovertemplate: '<b>舒张压</b><br>%{x}<br><b>%{y} mmHg</b><extra></extra>'
+            };
+
+            const diastolicLayout = {
+                height: 500,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Date & Time',
+                    gridcolor: '#e0e0e0'
+                },
+                yaxis: {
+                    title: '舒张压 (mmHg)',
+                    gridcolor: '#e0e0e0',
+                    range: [45, 85]
+                },
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: windowBP[0]?.datetime || '',
+                        x1: windowBP[windowBP.length - 1]?.datetime || '',
+                        y0: 57,
+                        y1: 57,
+                        line: { color: '#e74c3c', width: 3, dash: 'dash' },
+                        yref: 'y'
+                    },
+                    {
+                        type: 'rect',
+                        x0: windowBP[0]?.datetime || '',
+                        x1: windowBP[windowBP.length - 1]?.datetime || '',
+                        y0: 45,
+                        y1: 57,
+                        fillcolor: '#e74c3c',
+                        opacity: 0.1,
+                        line: { width: 0 }
+                    }
+                ],
+                annotations: Object.values(dailyStats).map(stat => {
+                    if (stat.minDiastolic) {
+                        return {
+                            x: stat.minDiastolic.datetime,
+                            y: stat.minDiastolic.value,
+                            text: `<b>${stat.minDiastolic.value}</b>`,
+                            showarrow: true,
+                            arrowhead: 2,
+                            arrowsize: 1,
+                            arrowwidth: 2,
+                            arrowcolor: '#2980b9',
+                            ax: 0,
+                            ay: 30,
+                            bgcolor: '#fff',
+                            bordercolor: '#2980b9',
+                            borderwidth: 2,
+                            borderpad: 4,
+                            font: { color: '#2980b9', size: 12, weight: 'bold' }
+                        };
+                    }
+                }).filter(a => a)
+            };
+
+            Plotly.newPlot('chart1', [systolicTrace], systolicLayout, {responsive: true});
+            Plotly.newPlot('chart2', [diastolicTrace], diastolicLayout, {responsive: true});
+
+            // Create seasonal/time-of-day charts
+            const seasonalSystolicTraces = [];
+            const seasonalDiastolicTraces = [];
+
+            // Generate green color gradient (darker = older date)
+            const numDays = windowDates.length;
+            windowDates.forEach((date, idx) => {
+                const dayData = windowBP.filter(d => d.date === date);
+
+                // Filter for 6am-10pm
+                const filteredData = dayData.filter(d => {
+                    const hour = new Date(d.datetime).getHours();
+                    return hour >= 6 && hour <= 22;
+                });
+
+                if (filteredData.length === 0) return;
+
+                // Sort by time
+                filteredData.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+
+                // Calculate green shade (older = darker, newer = lighter)
+                const greenIntensity = 255 - Math.floor((idx / Math.max(numDays - 1, 1)) * 100); // 155-255
+                const greenColor = `rgb(0, ${greenIntensity}, 0)`;
+
+                // Convert time to decimal hours for proper chronological ordering
+                const times = filteredData.map(d => {
+                    const [hours, minutes] = d.time.split(':');
+                    return parseInt(hours) + parseInt(minutes) / 60;
+                });
+                const timeStrings = filteredData.map(d => d.time);
+                const systolicValues = filteredData.map(d => d.systolic);
+                const diastolicValues = filteredData.map(d => d.diastolic);
+
+                // Systolic trace
+                seasonalSystolicTraces.push({
+                    x: times,
+                    y: systolicValues,
+                    mode: 'lines+markers',
+                    name: date,
+                    line: {
+                        color: greenColor,
+                        width: 2,
+                        shape: 'spline',
+                        smoothing: 1.3
+                    },
+                    marker: {
+                        size: 6,
+                        color: greenColor
+                    },
+                    text: timeStrings,
+                    hovertemplate: `<b>${date}</b><br>Time: %{text}<br>收缩压: %{y} mmHg<extra></extra>`
+                });
+
+                // Diastolic trace
+                seasonalDiastolicTraces.push({
+                    x: times,
+                    y: diastolicValues,
+                    mode: 'lines+markers',
+                    name: date,
+                    line: {
+                        color: greenColor,
+                        width: 2,
+                        shape: 'spline',
+                        smoothing: 1.3
+                    },
+                    marker: {
+                        size: 6,
+                        color: greenColor
+                    },
+                    text: timeStrings,
+                    hovertemplate: `<b>${date}</b><br>Time: %{text}<br>舒张压: %{y} mmHg<extra></extra>`
+                });
+            });
+
+            // Seasonal Systolic Layout
+            const seasonalSystolicLayout = {
+                height: 500,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Time of Day',
+                    gridcolor: '#e0e0e0',
+                    range: [6, 22],
+                    tickmode: 'array',
+                    tickvals: [6, 8, 10, 12, 14, 16, 18, 20, 22],
+                    ticktext: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00']
+                },
+                yaxis: {
+                    title: '收缩压 (mmHg)',
+                    gridcolor: '#e0e0e0',
+                    range: [90, 165]
+                },
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: 0,
+                        x1: 1,
+                        xref: 'paper',
+                        y0: 140,
+                        y1: 140,
+                        line: { color: '#e74c3c', width: 3, dash: 'dash' }
+                    },
+                    {
+                        type: 'rect',
+                        x0: 0,
+                        x1: 1,
+                        xref: 'paper',
+                        y0: 140,
+                        y1: 165,
+                        fillcolor: '#e74c3c',
+                        opacity: 0.1,
+                        line: { width: 0 }
+                    }
+                ],
+                showlegend: true,
+                legend: {
+                    title: { text: 'Dates (darker = older)' },
+                    orientation: 'v',
+                    x: 1.02,
+                    y: 1
+                }
+            };
+
+            // Seasonal Diastolic Layout
+            const seasonalDiastolicLayout = {
+                height: 500,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Time of Day',
+                    gridcolor: '#e0e0e0',
+                    range: [6, 22],
+                    tickmode: 'array',
+                    tickvals: [6, 8, 10, 12, 14, 16, 18, 20, 22],
+                    ticktext: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00']
+                },
+                yaxis: {
+                    title: '舒张压 (mmHg)',
+                    gridcolor: '#e0e0e0',
+                    range: [45, 85]
+                },
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: 0,
+                        x1: 1,
+                        xref: 'paper',
+                        y0: 57,
+                        y1: 57,
+                        line: { color: '#e74c3c', width: 3, dash: 'dash' }
+                    },
+                    {
+                        type: 'rect',
+                        x0: 0,
+                        x1: 1,
+                        xref: 'paper',
+                        y0: 45,
+                        y1: 57,
+                        fillcolor: '#e74c3c',
+                        opacity: 0.1,
+                        line: { width: 0 }
+                    }
+                ],
+                showlegend: true,
+                legend: {
+                    title: { text: 'Dates (darker = older)' },
+                    orientation: 'v',
+                    x: 1.02,
+                    y: 1
+                }
+            };
+
+            Plotly.newPlot('chart3', seasonalSystolicTraces, seasonalSystolicLayout, {responsive: true});
+            Plotly.newPlot('chart4', seasonalDiastolicTraces, seasonalDiastolicLayout, {responsive: true});
+
+            // Chart 5: Daily BP Range (Max Systolic - Min Diastolic)
+            const dailyRangeData = [];
+            windowDates.forEach(date => {
+                const stats = dailyStats[date];
+                if (stats && stats.maxSystolic && stats.minDiastolic) {
+                    const range = stats.maxSystolic.value - stats.minDiastolic.value;
+                    dailyRangeData.push({
+                        date: date,
+                        range: range
+                    });
+                }
+            });
+
+            const rangeTrace = {
+                x: dailyRangeData.map(d => d.date),
+                y: dailyRangeData.map(d => d.range),
+                mode: 'lines+markers',
+                name: 'BP Range',
+                line: {
+                    color: '#9b59b6',
+                    width: 3,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 10,
+                    color: '#9b59b6',
+                    line: { color: '#fff', width: 2 }
+                },
+                hovertemplate: '<b>%{x}</b><br>Range: %{y} mmHg<br>(Max 收缩压 - Min 舒张压)<extra></extra>'
+            };
+
+            const rangeLayout = {
+                height: 400,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Date',
+                    gridcolor: '#e0e0e0'
+                },
+                yaxis: {
+                    title: 'BP Range (mmHg)',
+                    gridcolor: '#e0e0e0'
+                },
+                showlegend: false
+            };
+
+            Plotly.newPlot('chart5', [rangeTrace], rangeLayout, {responsive: true});
+
+            // Display medications
+            if (windowMed.length > 0) {
+                let medHTML = '<h2>💊 Medications Taken in This Period</h2><div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">';
+                windowMed.forEach(m => {
+                    medHTML += `<div style="margin: 8px 0; padding: 10px; background: white; border-radius: 4px; border-left: 4px solid #9b59b6;">
+                        <strong>${m.datetime}</strong> - ${m.medication}: <strong>${m.dosage}</strong>
+                    </div>`;
+                });
+                medHTML += '</div>';
+                document.getElementById('medications').innerHTML = medHTML;
+            } else {
+                document.getElementById('medications').innerHTML = '<p style="color: #7f8c8d;">No medications recorded in this period.</p>';
+            }
+
+            // Update button states
+            document.getElementById('prevBtn').disabled = currentWindowStart === 0;
+            document.getElementById('nextBtn').disabled = currentWindowStart + windowSize >= allDates.length;
+        }
+
+        function moveWindow(direction) {
+            const newStart = currentWindowStart + direction;
+            if (newStart >= 0 && newStart < allDates.length) {
+                currentWindowStart = newStart;
+                updateView();
+            }
+        }
+
+        // Wrap initialization
+        function initializeApp() {
+            updateView();
+        }
+
+        // Load data and initialize
+        loadData();
+    </script>
+</body>
+</html>

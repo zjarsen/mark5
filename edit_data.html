@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Blood Pressure Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .date-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="date"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #3498db;
+            border-radius: 6px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-save {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .btn-save:hover {
+            background-color: #27ae60;
+        }
+        .btn-return {
+            background-color: #95a5a6;
+            color: white;
+        }
+        .btn-return:hover {
+            background-color: #7f8c8d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:hover {
+            background-color: #f5f9fc;
+        }
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .time-col {
+            font-weight: bold;
+            color: #2c3e50;
+            background-color: #ecf0f1;
+        }
+        .message {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Edit Blood Pressure Data</h1>
+
+        <div id="message" class="message"></div>
+
+        <div class="controls">
+            <div class="date-selector">
+                <label for="dateInput"><strong>Select Date:</strong></label>
+                <input type="date" id="dateInput" />
+            </div>
+            <div>
+                <button class="btn-save" onclick="saveData()">💾 Save</button>
+                <button class="btn-return" onclick="window.location.href='/'">← Return to Graphs</button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">Loading data...</div>
+
+        <div id="tableContainer" style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>收缩压<br>(Systolic)</th>
+                        <th>舒张压<br>(Diastolic)</th>
+                        <th>心跳<br>(Heart Rate)</th>
+                        <th>坎地沙坦<br>(Candesartan)</th>
+                        <th>乐卡地平<br>(Lercanidipine)</th>
+                        <th>美托洛尔<br>(Metoprolol)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateInput').value = today;
+
+        // Generate time slots from 06:30 to 21:30 (31 slots)
+        function generateTimeSlots() {
+            const slots = [];
+            for (let hour = 6; hour <= 21; hour++) {
+                if (hour === 6) {
+                    slots.push(`${hour.toString().padStart(2, '0')}:30`);
+                } else {
+                    slots.push(`${hour.toString().padStart(2, '0')}:00`);
+                    if (hour < 21) {
+                        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+                    }
+                }
+            }
+            return slots;
+        }
+
+        // Initialize table
+        function initializeTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            const timeSlots = generateTimeSlots();
+
+            timeSlots.forEach(time => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td class="time-col">${time}</td>
+                    <td><input type="number" id="systolic_${time}" placeholder="-" /></td>
+                    <td><input type="number" id="diastolic_${time}" placeholder="-" /></td>
+                    <td><input type="number" id="heartrate_${time}" placeholder="-" /></td>
+                    <td><input type="number" step="0.01" id="med1_${time}" placeholder="-" /></td>
+                    <td><input type="number" step="0.01" id="med2_${time}" placeholder="-" /></td>
+                    <td><input type="number" step="0.01" id="med3_${time}" placeholder="-" /></td>
+                `;
+            });
+        }
+
+        // Load data for selected date
+        async function loadData() {
+            const date = document.getElementById('dateInput').value;
+            if (!date) return;
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('message').style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/data/${date}`);
+                const data = await response.json();
+
+                // Clear all inputs first
+                initializeTable();
+
+                // Fill in BP readings
+                data.bp_readings.forEach(record => {
+                    const datetime = record[0];
+                    const time = datetime.split(' ')[1].substring(0, 5); // Extract HH:MM
+                    const systolic = record[1];
+                    const diastolic = record[2];
+                    const heartRate = record[3];
+
+                    if (document.getElementById(`systolic_${time}`)) {
+                        if (systolic) document.getElementById(`systolic_${time}`).value = systolic;
+                        if (diastolic) document.getElementById(`diastolic_${time}`).value = diastolic;
+                        if (heartRate) document.getElementById(`heartrate_${time}`).value = heartRate;
+                    }
+                });
+
+                // Fill in medications
+                data.medications.forEach(record => {
+                    const datetime = record[0];
+                    const time = datetime.split(' ')[1].substring(0, 5);
+                    const medication = record[1];
+                    const dosage = record[2];
+
+                    let inputId = null;
+                    if (medication.includes('坎地沙坦') || medication.includes('Candesartan')) {
+                        inputId = `med1_${time}`;
+                    } else if (medication.includes('乐卡地平') || medication.includes('Lercanidipine')) {
+                        inputId = `med2_${time}`;
+                    } else if (medication.includes('美托洛尔') || medication.includes('Metoprolol')) {
+                        inputId = `med3_${time}`;
+                    }
+
+                    if (inputId && document.getElementById(inputId)) {
+                        document.getElementById(inputId).value = dosage;
+                    }
+                });
+
+            } catch (error) {
+                showMessage('Error loading data: ' + error.message, 'error');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Save data
+        async function saveData() {
+            const date = document.getElementById('dateInput').value;
+            if (!date) {
+                showMessage('Please select a date', 'error');
+                return;
+            }
+
+            const timeSlots = generateTimeSlots();
+            const bpReadings = [];
+            const medications = [];
+
+            timeSlots.forEach(time => {
+                const datetime = `${date} ${time}:00`;
+
+                const systolic = document.getElementById(`systolic_${time}`).value;
+                const diastolic = document.getElementById(`diastolic_${time}`).value;
+                const heartRate = document.getElementById(`heartrate_${time}`).value;
+
+                // Add BP reading if at least one field is filled
+                if (systolic || diastolic || heartRate) {
+                    bpReadings.push({
+                        datetime: datetime,
+                        systolic: systolic ? parseInt(systolic) : null,
+                        diastolic: diastolic ? parseInt(diastolic) : null,
+                        heart_rate: heartRate ? parseInt(heartRate) : null
+                    });
+                }
+
+                // Add medications if dosage is provided
+                const med1 = document.getElementById(`med1_${time}`).value;
+                const med2 = document.getElementById(`med2_${time}`).value;
+                const med3 = document.getElementById(`med3_${time}`).value;
+
+                if (med1) {
+                    medications.push({
+                        datetime: datetime,
+                        medication: '坎地沙坦 (Candesartan)',
+                        dosage: parseFloat(med1)
+                    });
+                }
+                if (med2) {
+                    medications.push({
+                        datetime: datetime,
+                        medication: '乐卡地平 (Lercanidipine)',
+                        dosage: parseFloat(med2)
+                    });
+                }
+                if (med3) {
+                    medications.push({
+                        datetime: datetime,
+                        medication: '美托洛尔 (Metoprolol)',
+                        dosage: parseFloat(med3)
+                    });
+                }
+            });
+
+            try {
+                const response = await fetch(`/api/data/${date}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        bp_readings: bpReadings,
+                        medications: medications
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('✓ Data saved successfully!', 'success');
+                } else {
+                    showMessage('Error saving data', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Show message
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Event listener for date change
+        document.getElementById('dateInput').addEventListener('change', loadData);
+
+        // Initialize on load
+        initializeTable();
+        loadData();
+    </script>
+</body>
+</html>
