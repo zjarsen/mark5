@@ -171,6 +171,11 @@
         <div id="chart3" style="margin-top: 20px;"></div>
         <div id="chart4" style="margin-top: 10px; margin-bottom: 20px;"></div>
 
+        <h2 style="margin-top: 40px; margin-bottom: 20px; color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            ❤️ Heart Rate Pattern (Time of Day)
+        </h2>
+        <div id="chart6" style="margin-top: 20px; margin-bottom: 30px;"></div>
+
         <h2 style="margin-top: 40px; margin-bottom: 20px; color: #9b59b6; border-bottom: 2px solid #9b59b6; padding-bottom: 10px;">
             📊 Daily Blood Pressure Range Trend
         </h2>
@@ -724,6 +729,85 @@
 
             Plotly.newPlot('chart3', seasonalSystolicTraces, seasonalSystolicLayout, {responsive: true});
             Plotly.newPlot('chart4', seasonalDiastolicTraces, seasonalDiastolicLayout, {responsive: true});
+
+            // Chart 6: Heart Rate by Time of Day
+            const seasonalHeartRateTraces = [];
+
+            // Generate red color gradient (darker = older date)
+            windowDates.forEach((date, idx) => {
+                const dayData = windowBP.filter(d => d.date === date);
+
+                // Filter for 6am-10pm and valid heart rate data
+                const filteredData = dayData.filter(d => {
+                    const hour = new Date(d.datetime).getHours();
+                    return hour >= 6 && hour <= 22 && d.heart_rate !== null;
+                });
+
+                if (filteredData.length === 0) return;
+
+                // Sort by time
+                filteredData.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+
+                // Calculate red shade (older = darker, newer = lighter)
+                const redIntensity = 255 - Math.floor((idx / Math.max(numDays - 1, 1)) * 100); // 155-255
+                const redColor = `rgb(${redIntensity}, 0, 0)`;
+
+                // Convert time to decimal hours for proper chronological ordering
+                const times = filteredData.map(d => {
+                    const [hours, minutes] = d.time.split(':');
+                    return parseInt(hours) + parseInt(minutes) / 60;
+                });
+                const timeStrings = filteredData.map(d => d.time);
+                const heartRateValues = filteredData.map(d => d.heart_rate);
+
+                // Heart rate trace
+                seasonalHeartRateTraces.push({
+                    x: times,
+                    y: heartRateValues,
+                    mode: 'lines+markers',
+                    name: date,
+                    line: {
+                        color: redColor,
+                        width: 2,
+                        shape: 'spline',
+                        smoothing: 1.3
+                    },
+                    marker: {
+                        size: 6,
+                        color: redColor
+                    },
+                    text: timeStrings,
+                    hovertemplate: `<b>${date}</b><br>Time: %{text}<br>Heart Rate: %{y} bpm<extra></extra>`
+                });
+            });
+
+            // Heart Rate Layout
+            const seasonalHeartRateLayout = {
+                height: 500,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Time of Day',
+                    gridcolor: '#e0e0e0',
+                    range: [6, 22],
+                    tickmode: 'array',
+                    tickvals: [6, 8, 10, 12, 14, 16, 18, 20, 22],
+                    ticktext: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00']
+                },
+                yaxis: {
+                    title: 'Heart Rate (bpm)',
+                    gridcolor: '#e0e0e0'
+                },
+                showlegend: true,
+                legend: {
+                    title: { text: 'Dates (darker = older)' },
+                    orientation: 'v',
+                    x: 1.02,
+                    y: 1
+                }
+            };
+
+            Plotly.newPlot('chart6', seasonalHeartRateTraces, seasonalHeartRateLayout, {responsive: true});
 
             // Chart 5: Daily BP Range (Max Systolic - Min Diastolic)
             const dailyRangeData = [];
