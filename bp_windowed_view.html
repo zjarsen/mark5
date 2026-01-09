@@ -164,6 +164,11 @@
         <div id="chart1" style="margin-top: 20px;"></div>
         <div id="chart2" style="margin-top: 10px; margin-bottom: 20px;"></div>
 
+        <h2 style="margin-top: 40px; margin-bottom: 20px; color: #e67e22; border-bottom: 2px solid #e67e22; padding-bottom: 10px;">
+            📉 Daily Average Blood Pressure Trend
+        </h2>
+        <div id="chart7" style="margin-top: 20px; margin-bottom: 30px;"></div>
+
         <h2 style="margin-top: 40px; margin-bottom: 20px; color: #27ae60; border-bottom: 2px solid #27ae60; padding-bottom: 10px;">
             📈 Daily Pattern Analysis (Time of Day)
         </h2>
@@ -554,6 +559,113 @@
 
             Plotly.newPlot('chart1', [systolicTrace], systolicLayout, {responsive: true});
             Plotly.newPlot('chart2', [diastolicTrace], diastolicLayout, {responsive: true});
+
+            // Chart 7: Daily Average Blood Pressure Trend
+            const dailyAvgData = {};
+            windowDates.forEach(date => {
+                const dayData = windowBP.filter(d => d.date === date);
+                const systolicValues = dayData.filter(d => d.systolic !== null).map(d => d.systolic);
+                const diastolicValues = dayData.filter(d => d.diastolic !== null).map(d => d.diastolic);
+
+                if (systolicValues.length > 0 || diastolicValues.length > 0) {
+                    dailyAvgData[date] = {
+                        avgSystolic: systolicValues.length > 0 ?
+                            systolicValues.reduce((a, b) => a + b, 0) / systolicValues.length : null,
+                        avgDiastolic: diastolicValues.length > 0 ?
+                            diastolicValues.reduce((a, b) => a + b, 0) / diastolicValues.length : null
+                    };
+                }
+            });
+
+            const dailyAvgDates = Object.keys(dailyAvgData);
+            const avgSystolicValues = dailyAvgDates.map(date => dailyAvgData[date].avgSystolic);
+            const avgDiastolicValues = dailyAvgDates.map(date => dailyAvgData[date].avgDiastolic);
+
+            const avgSystolicTrace = {
+                x: dailyAvgDates,
+                y: avgSystolicValues,
+                mode: 'lines+markers',
+                name: '收缩压 (Systolic)',
+                line: {
+                    color: '#e74c3c',
+                    width: 3,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 10,
+                    color: '#e74c3c',
+                    line: { color: '#fff', width: 2 }
+                },
+                hovertemplate: '<b>%{x}</b><br>Avg 收缩压: %{y:.1f} mmHg<extra></extra>'
+            };
+
+            const avgDiastolicTrace = {
+                x: dailyAvgDates,
+                y: avgDiastolicValues,
+                mode: 'lines+markers',
+                name: '舒张压 (Diastolic)',
+                line: {
+                    color: '#3498db',
+                    width: 3,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 10,
+                    color: '#3498db',
+                    line: { color: '#fff', width: 2 }
+                },
+                hovertemplate: '<b>%{x}</b><br>Avg 舒张压: %{y:.1f} mmHg<extra></extra>'
+            };
+
+            const dailyAvgLayout = {
+                height: 550,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Date',
+                    gridcolor: '#e0e0e0'
+                },
+                yaxis: {
+                    title: 'Blood Pressure (mmHg)',
+                    gridcolor: '#e0e0e0',
+                    range: [45, 165]
+                },
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: dailyAvgDates[0] || '',
+                        x1: dailyAvgDates[dailyAvgDates.length - 1] || '',
+                        y0: 140,
+                        y1: 140,
+                        line: { color: '#e74c3c', width: 2, dash: 'dash' },
+                        yref: 'y'
+                    },
+                    {
+                        type: 'line',
+                        x0: dailyAvgDates[0] || '',
+                        x1: dailyAvgDates[dailyAvgDates.length - 1] || '',
+                        y0: 57,
+                        y1: 57,
+                        line: { color: '#3498db', width: 2, dash: 'dash' },
+                        yref: 'y'
+                    }
+                ],
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: 1.1,
+                    yanchor: 'top',
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: '#bdc3c7',
+                    borderwidth: 1
+                }
+            };
+
+            Plotly.newPlot('chart7', [avgSystolicTrace, avgDiastolicTrace], dailyAvgLayout, {responsive: true});
 
             // Create seasonal/time-of-day charts
             const seasonalSystolicTraces = [];
