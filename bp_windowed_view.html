@@ -154,9 +154,18 @@
                 </div>
                 <div style="width: 2px; height: 40px; background-color: #bdc3c7;"></div>
                 <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="font-weight: bold; color: #34495e;">Quick Select:</div>
+                    <button onclick="setWindowSize(7)" style="padding: 8px 16px; font-size: 14px;">7d</button>
+                    <button onclick="setWindowSize(14)" style="padding: 8px 16px; font-size: 14px;">14d</button>
+                    <button onclick="setWindowSize(30)" style="padding: 8px 16px; font-size: 14px;">30d</button>
+                    <button onclick="setWindowSize('all')" style="padding: 8px 16px; font-size: 14px;">All</button>
+                </div>
+                <div style="width: 2px; height: 40px; background-color: #bdc3c7;"></div>
+                <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="font-weight: bold; color: #34495e;">Navigate:</div>
                     <button id="prevBtn" onclick="moveWindow(-1)">← Prev</button>
                     <button id="nextBtn" onclick="moveWindow(1)">Next →</button>
+                    <button onclick="moveToLatest()" style="padding: 8px 16px; background-color: #27ae60;">Latest ⏭</button>
                 </div>
             </div>
         </div>
@@ -177,7 +186,7 @@
         <div id="chart4" style="margin-top: 10px; margin-bottom: 20px;"></div>
 
         <h2 style="margin-top: 40px; margin-bottom: 20px; color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
-            ❤️ Heart Rate Pattern (Time of Day)
+            ❤️ Daily Average Heart Rate Trend
         </h2>
         <div id="chart6" style="margin-top: 20px; margin-bottom: 30px;"></div>
 
@@ -185,6 +194,11 @@
             📊 Daily Blood Pressure Range Trend
         </h2>
         <div id="chart5" style="margin-top: 20px; margin-bottom: 30px;"></div>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px; color: #16a085; border-bottom: 2px solid #16a085; padding-bottom: 10px;">
+            📈 Daily Average Pressure Difference (压差)
+        </h2>
+        <div id="chart8" style="margin-top: 20px; margin-bottom: 30px;"></div>
 
         <div id="medications"></div>
     </div>
@@ -254,6 +268,25 @@
         function changeWindowSize(delta) {
             const newSize = windowSize + delta;
             if (newSize >= 1 && newSize <= allDates.length) {
+                windowSize = newSize;
+                // Adjust window start if needed
+                if (currentWindowStart + windowSize > allDates.length) {
+                    currentWindowStart = Math.max(0, allDates.length - windowSize);
+                }
+                document.getElementById('windowSizeDisplay').textContent = `${windowSize} day${windowSize !== 1 ? 's' : ''}`;
+                updateView();
+            }
+        }
+
+        function setWindowSize(size) {
+            let newSize;
+            if (size === 'all') {
+                newSize = allDates.length;
+            } else {
+                newSize = Math.min(size, allDates.length);
+            }
+
+            if (newSize >= 1) {
                 windowSize = newSize;
                 // Adjust window start if needed
                 if (currentWindowStart + windowSize > allDates.length) {
@@ -581,6 +614,46 @@
             const avgSystolicValues = dailyAvgDates.map(date => dailyAvgData[date].avgSystolic);
             const avgDiastolicValues = dailyAvgDates.map(date => dailyAvgData[date].avgDiastolic);
 
+            // Calculate moving average based on window size
+            function calculateMovingAverage(values, windowSizeDays) {
+                // Determine MA period based on window size
+                let maPeriod;
+                if (windowSizeDays < 5) {
+                    return null; // Not enough data for meaningful MA
+                } else if (windowSizeDays <= 9) {
+                    maPeriod = 3; // 3-day MA for small windows
+                } else {
+                    maPeriod = 5; // 5-day MA for larger windows
+                }
+
+                if (values.length < maPeriod) {
+                    return null; // Not enough data points
+                }
+
+                const maValues = [];
+                for (let i = 0; i < values.length; i++) {
+                    if (i < maPeriod - 1) {
+                        maValues.push(null); // Not enough preceding values
+                    } else {
+                        // Calculate average of last 'maPeriod' values
+                        let sum = 0;
+                        let count = 0;
+                        for (let j = 0; j < maPeriod; j++) {
+                            if (values[i - j] !== null) {
+                                sum += values[i - j];
+                                count++;
+                            }
+                        }
+                        maValues.push(count > 0 ? sum / count : null);
+                    }
+                }
+                return maValues;
+            }
+
+            // Calculate moving averages
+            const maSystolicValues = calculateMovingAverage(avgSystolicValues, windowSize);
+            const maDiastolicValues = calculateMovingAverage(avgDiastolicValues, windowSize);
+
             const avgSystolicTrace = {
                 x: dailyAvgDates,
                 y: avgSystolicValues,
@@ -618,6 +691,45 @@
                 },
                 hovertemplate: '<b>%{x}</b><br>Avg 舒张压: %{y:.1f} mmHg<extra></extra>'
             };
+
+            // Create moving average traces (only if we have enough data)
+            const traces = [avgSystolicTrace, avgDiastolicTrace];
+
+            if (maSystolicValues !== null) {
+                const maPeriod = windowSize <= 9 ? 3 : 5;
+
+                traces.push({
+                    x: dailyAvgDates,
+                    y: maSystolicValues,
+                    mode: 'lines',
+                    name: `收缩压 ${maPeriod}d MA`,
+                    line: {
+                        color: '#e74c3c',
+                        width: 2.5,
+                        dash: 'dash'
+                    },
+                    opacity: 0.7,
+                    hovertemplate: `<b>%{x}</b><br>${maPeriod}-day MA 收缩压: %{y:.1f} mmHg<extra></extra>`
+                });
+            }
+
+            if (maDiastolicValues !== null) {
+                const maPeriod = windowSize <= 9 ? 3 : 5;
+
+                traces.push({
+                    x: dailyAvgDates,
+                    y: maDiastolicValues,
+                    mode: 'lines',
+                    name: `舒张压 ${maPeriod}d MA`,
+                    line: {
+                        color: '#3498db',
+                        width: 2.5,
+                        dash: 'dash'
+                    },
+                    opacity: 0.7,
+                    hovertemplate: `<b>%{x}</b><br>${maPeriod}-day MA 舒张压: %{y:.1f} mmHg<extra></extra>`
+                });
+            }
 
             const dailyAvgLayout = {
                 height: 550,
@@ -665,7 +777,7 @@
                 }
             };
 
-            Plotly.newPlot('chart7', [avgSystolicTrace, avgDiastolicTrace], dailyAvgLayout, {responsive: true});
+            Plotly.newPlot('chart7', traces, dailyAvgLayout, {responsive: true});
 
             // Create seasonal/time-of-day charts
             const seasonalSystolicTraces = [];
@@ -842,84 +954,79 @@
             Plotly.newPlot('chart3', seasonalSystolicTraces, seasonalSystolicLayout, {responsive: true});
             Plotly.newPlot('chart4', seasonalDiastolicTraces, seasonalDiastolicLayout, {responsive: true});
 
-            // Chart 6: Heart Rate by Time of Day
-            const seasonalHeartRateTraces = [];
-
-            // Generate red color gradient (darker = older date)
-            windowDates.forEach((date, idx) => {
+            // Chart 6: Daily Average Heart Rate Trend
+            const dailyAvgHRData = {};
+            windowDates.forEach(date => {
                 const dayData = windowBP.filter(d => d.date === date);
+                const heartRateValues = dayData.filter(d => d.heart_rate !== null).map(d => d.heart_rate);
 
-                // Filter for 6am-10pm and valid heart rate data
-                const filteredData = dayData.filter(d => {
-                    const hour = new Date(d.datetime).getHours();
-                    return hour >= 6 && hour <= 22 && d.heart_rate !== null;
-                });
-
-                if (filteredData.length === 0) return;
-
-                // Sort by time
-                filteredData.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
-
-                // Calculate red shade (older = darker, newer = lighter)
-                const redIntensity = 255 - Math.floor((idx / Math.max(numDays - 1, 1)) * 100); // 155-255
-                const redColor = `rgb(${redIntensity}, 0, 0)`;
-
-                // Convert time to decimal hours for proper chronological ordering
-                const times = filteredData.map(d => {
-                    const [hours, minutes] = d.time.split(':');
-                    return parseInt(hours) + parseInt(minutes) / 60;
-                });
-                const timeStrings = filteredData.map(d => d.time);
-                const heartRateValues = filteredData.map(d => d.heart_rate);
-
-                // Heart rate trace
-                seasonalHeartRateTraces.push({
-                    x: times,
-                    y: heartRateValues,
-                    mode: 'lines+markers',
-                    name: date,
-                    line: {
-                        color: redColor,
-                        width: 2,
-                        shape: 'spline',
-                        smoothing: 1.3
-                    },
-                    marker: {
-                        size: 6,
-                        color: redColor
-                    },
-                    text: timeStrings,
-                    hovertemplate: `<b>${date}</b><br>Time: %{text}<br>Heart Rate: %{y} bpm<extra></extra>`
-                });
+                if (heartRateValues.length > 0) {
+                    dailyAvgHRData[date] = {
+                        avgHR: heartRateValues.reduce((a, b) => a + b, 0) / heartRateValues.length
+                    };
+                }
             });
 
-            // Heart Rate Layout
-            const seasonalHeartRateLayout = {
+            const dailyAvgHRDates = Object.keys(dailyAvgHRData);
+            const avgHRValues = dailyAvgHRDates.map(date => dailyAvgHRData[date].avgHR);
+
+            const avgHRTrace = {
+                x: dailyAvgHRDates,
+                y: avgHRValues,
+                mode: 'lines+markers',
+                name: 'Daily Avg Heart Rate',
+                line: {
+                    color: '#e74c3c',
+                    width: 3,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 10,
+                    color: '#e74c3c',
+                    line: { color: '#fff', width: 2 }
+                },
+                hovertemplate: '<b>%{x}</b><br>Avg Heart Rate: %{y:.1f} bpm<extra></extra>'
+            };
+
+            const dailyAvgHRLayout = {
                 height: 500,
                 hovermode: 'closest',
                 margin: { t: 20, b: 50, l: 60, r: 20 },
                 xaxis: {
-                    title: 'Time of Day',
-                    gridcolor: '#e0e0e0',
-                    range: [6, 22],
-                    tickmode: 'array',
-                    tickvals: [6, 8, 10, 12, 14, 16, 18, 20, 22],
-                    ticktext: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00']
+                    title: 'Date',
+                    gridcolor: '#e0e0e0'
                 },
                 yaxis: {
                     title: 'Heart Rate (bpm)',
                     gridcolor: '#e0e0e0'
                 },
-                showlegend: true,
-                legend: {
-                    title: { text: 'Dates (darker = older)' },
-                    orientation: 'v',
-                    x: 1.02,
-                    y: 1
-                }
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: dailyAvgHRDates[0] || '',
+                        x1: dailyAvgHRDates[dailyAvgHRDates.length - 1] || '',
+                        y0: 80,
+                        y1: 80,
+                        line: { color: '#e74c3c', width: 2, dash: 'dash' },
+                        yref: 'y'
+                    },
+                    {
+                        type: 'rect',
+                        x0: dailyAvgHRDates[0] || '',
+                        x1: dailyAvgHRDates[dailyAvgHRDates.length - 1] || '',
+                        y0: 80,
+                        y1: 1,
+                        yref: 'paper',
+                        fillcolor: '#e74c3c',
+                        opacity: 0.1,
+                        line: { width: 0 }
+                    }
+                ],
+                showlegend: false
             };
 
-            Plotly.newPlot('chart6', seasonalHeartRateTraces, seasonalHeartRateLayout, {responsive: true});
+            Plotly.newPlot('chart6', [avgHRTrace], dailyAvgHRLayout, {responsive: true});
 
             // Chart 5: Daily BP Range (Max Systolic - Min Diastolic)
             const dailyRangeData = [];
@@ -970,6 +1077,63 @@
 
             Plotly.newPlot('chart5', [rangeTrace], rangeLayout, {responsive: true});
 
+            // Chart 8: Daily Average Pressure Difference (压差 = 收缩压 - 舒张压)
+            const pressureDiffData = [];
+            windowDates.forEach(date => {
+                const dayData = windowBP.filter(d => d.date === date);
+                const systolicValues = dayData.filter(d => d.systolic !== null).map(d => d.systolic);
+                const diastolicValues = dayData.filter(d => d.diastolic !== null).map(d => d.diastolic);
+
+                if (systolicValues.length > 0 && diastolicValues.length > 0) {
+                    const avgSystolic = systolicValues.reduce((a, b) => a + b, 0) / systolicValues.length;
+                    const avgDiastolic = diastolicValues.reduce((a, b) => a + b, 0) / diastolicValues.length;
+                    const pressureDiff = avgSystolic - avgDiastolic;
+
+                    pressureDiffData.push({
+                        date: date,
+                        diff: pressureDiff,
+                        avgSystolic: avgSystolic,
+                        avgDiastolic: avgDiastolic
+                    });
+                }
+            });
+
+            const pressureDiffTrace = {
+                x: pressureDiffData.map(d => d.date),
+                y: pressureDiffData.map(d => d.diff),
+                mode: 'lines+markers',
+                name: '压差 (Pulse Pressure)',
+                line: {
+                    color: '#16a085',
+                    width: 3,
+                    shape: 'spline',
+                    smoothing: 1.3
+                },
+                marker: {
+                    size: 10,
+                    color: '#16a085',
+                    line: { color: '#fff', width: 2 }
+                },
+                hovertemplate: '<b>%{x}</b><br>压差: %{y:.1f} mmHg<br>(Avg 收缩压 - Avg 舒张压)<extra></extra>'
+            };
+
+            const pressureDiffLayout = {
+                height: 400,
+                hovermode: 'closest',
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                xaxis: {
+                    title: 'Date',
+                    gridcolor: '#e0e0e0'
+                },
+                yaxis: {
+                    title: '压差 (mmHg)',
+                    gridcolor: '#e0e0e0'
+                },
+                showlegend: false
+            };
+
+            Plotly.newPlot('chart8', [pressureDiffTrace], pressureDiffLayout, {responsive: true});
+
             // Display medications
             if (windowMed.length > 0) {
                 let medHTML = '<h2>💊 Medications Taken in This Period</h2><div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">';
@@ -995,6 +1159,11 @@
                 currentWindowStart = newStart;
                 updateView();
             }
+        }
+
+        function moveToLatest() {
+            currentWindowStart = Math.max(0, allDates.length - windowSize);
+            updateView();
         }
 
         // Wrap initialization
